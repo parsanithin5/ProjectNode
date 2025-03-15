@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Food Delivery</title>
+    <link rel="stylesheet" href="styles.css">
+    <script>
+        let order = {
+            customerName: "",
+            restaurantName: "",
+            items: []
+        };
+
+        function fetchRestaurants() {
+            fetch("http://localhost:5000/restaurants")
+                .then(response => response.json())
+                .then(data => {
+                    let list = document.getElementById("restaurant-list");
+                    list.innerHTML = ""; 
+                    data.forEach(restaurant => {
+                        let div = document.createElement("div");
+                        div.classList.add("restaurant");
+
+                        div.innerHTML = `<h2>${restaurant.name}</h2>`; 
+
+                        let menuList = document.createElement("ul");
+                        restaurant.menu.forEach(item => {
+                            let menuItem = document.createElement("li");
+                            menuItem.classList.add("menu-item");
+                            menuItem.innerHTML = `
+                                ${item.item} - $${item.price} 
+                                <button onclick="addToOrder('${restaurant.name}', '${item.item}', ${item.price})">Order</button>
+                            `;
+                            menuList.appendChild(menuItem);
+                        });
+
+                        div.appendChild(menuList);
+                        list.appendChild(div);
+                    });
+                })
+                .catch(error => console.error("Error fetching restaurants:", error));
+        }
+
+        function addToOrder(restaurantName, itemName, price) {
+            if (order.restaurantName && order.restaurantName !== restaurantName) {
+                alert("You can only order from one restaurant at a time!");
+                return;
+            }
+
+            order.restaurantName = restaurantName;
+            order.items.push({ item: itemName, price });
+
+            document.getElementById("order-summary").innerText =
+                `Order from: ${order.restaurantName}\n` + 
+                order.items.map(i => `${i.item} - $${i.price}`).join("\n"); 
+        }
+
+        function placeOrder() {
+            let customerName = document.getElementById("customer-name").value.trim();
+            if (!customerName) {
+                alert("Please enter your name before placing an order.");
+                return;
+            }
+
+            if (order.items.length === 0) {
+                alert("Your order is empty!");
+                return;
+            }
+
+            order.customerName = customerName;
+
+            fetch("http://localhost:5000/order", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(order)
+            })
+            .then(response => response.json())
+            .then(data => {
+                alert(data.message);
+
+                document.getElementById("order-details").innerHTML = `
+                    <h3>Order Summary</h3>
+                    <p><strong>Customer:</strong> ${data.order.customerName}</p>
+                    <p><strong>Restaurant:</strong> ${data.order.restaurantName}</p>
+                    <ul>
+                        ${data.order.items.map(i => `<li>${i.item} - $${i.price}</li>`).join("")}
+                    </ul>
+                    <p><strong>Total Price:</strong> $${data.order.totalPrice}</p>
+                `;
+
+                order = { customerName: "", restaurantName: "", items: [] };
+                document.getElementById("order-summary").innerText = "";
+                document.getElementById("customer-name").value = "";
+            })
+            .catch(error => console.error("Error placing order:", error));
+        }
+    </script>
+</head>
+<body>
+    <div class="container">
+        <h1>Restaurants</h1>
+        <button onclick="fetchRestaurants()" class="btn">Load Restaurants</button>
+        <div id="restaurant-list" class="restaurant-list"></div>
+
+        <h2>Your Order</h2>
+        <input type="text" id="customer-name" placeholder="Enter your name" class="input" />
+        <pre id="order-summary" class="order-summary"></pre>
+        <button onclick="placeOrder()" class="btn">Place Order</button>
+
+        <h2>Order Confirmation</h2>
+        <div id="order-details" class="order-details"></div>
+    </div>
+</body>
+</html>
